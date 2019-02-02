@@ -13,25 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.jboot.web.render;
+package io.jboot.core.weight;
 
-import io.jboot.app.config.annotation.ConfigModel;
-import io.jboot.utils.StrUtil;
+import java.lang.annotation.*;
 
-@ConfigModel(prefix = "jboot.render")
-public class JbootRenderConfig {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Documented
+public @interface Weight {
 
-    private String cdn;
+    int value() default 0;
 
-    public String getCdn() {
-        return cdn;
-    }
-
-    public void setCdn(String cdn) {
-        this.cdn = cdn;
-    }
-
-    public boolean isEnableCdn() {
-        return StrUtil.isNotBlank(cdn);
-    }
 }

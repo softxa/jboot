@@ -22,8 +22,9 @@ import com.jfinal.log.Log;
 import com.jfinal.template.Engine;
 import io.jboot.aop.jfinal.JfinalHandlers;
 import io.jboot.aop.jfinal.JfinalPlugins;
-import io.jboot.utils.ClassUtil;
+import io.jboot.core.weight.WeightUtil;
 import io.jboot.utils.ClassScanner;
+import io.jboot.utils.ClassUtil;
 import io.jboot.web.fixedinterceptor.FixedInterceptors;
 
 import java.util.ArrayList;
@@ -58,6 +59,8 @@ public class JbootAppListenerManager implements JbootAppListener {
                 listeners.add(listener);
             }
         }
+
+        WeightUtil.sort(listeners);
     }
 
 
@@ -150,10 +153,21 @@ public class JbootAppListenerManager implements JbootAppListener {
     }
 
     @Override
-    public void onJFinalStarted() {
+    public void onJFinalStartBefore() {
         for (JbootAppListener listener : listeners) {
             try {
-                listener.onJFinalStarted();
+                listener.onJFinalStartBefore();
+            } catch (Throwable ex) {
+                log.error(ex.toString(), ex);
+            }
+        }
+    }
+
+    @Override
+    public void onJFinalStart() {
+        for (JbootAppListener listener : listeners) {
+            try {
+                listener.onJFinalStart();
             } catch (Throwable ex) {
                 log.error(ex.toString(), ex);
             }

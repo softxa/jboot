@@ -17,6 +17,8 @@ package io.jboot.components.event;
 
 import com.jfinal.log.Log;
 import io.jboot.Jboot;
+import io.jboot.core.weight.WeightUtil;
+import io.jboot.utils.AnnotationUtil;
 import io.jboot.utils.ClassUtil;
 import io.jboot.utils.ClassScanner;
 import io.jboot.components.event.annotation.EventConfig;
@@ -38,7 +40,7 @@ public class JbootEventManager {
     public JbootEventManager() {
         threadPool = new ThreadPoolExecutor(0, Integer.MAX_VALUE,
                 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>());
+                new SynchronousQueue<>());
         asyncListenerMap = new ConcurrentHashMap<>();
         listenerMap = new ConcurrentHashMap<>();
 
@@ -68,7 +70,7 @@ public class JbootEventManager {
         deleteListner(asyncListenerMap, listenerClass);
 
         if (Jboot.isDevMode()) {
-            System.out.println(String.format("listener[%s]-->>unRegisterListener.", listenerClass));
+            log.debug(String.format("listener[%s]-->>unRegisterListener.", listenerClass));
         }
 
     }
@@ -99,8 +101,8 @@ public class JbootEventManager {
             return;
         }
 
-        String[] actions = listenerAnnotation.action();
-        if (actions == null || actions.length == 0) {
+        String[] actions = AnnotationUtil.get(listenerAnnotation.action());
+        if (actions == null) {
             log.warn("listenerClass[" + listenerAnnotation + "] register fail, because action is null or blank.");
             return;
         }
@@ -145,6 +147,8 @@ public class JbootEventManager {
 
             list.add(eventListener);
 
+            WeightUtil.sort(list);
+
             if (async) {
                 asyncListenerMap.put(action, list);
             } else {
@@ -153,7 +157,7 @@ public class JbootEventManager {
         }
 
         if (Jboot.isDevMode()) {
-            System.out.println(String.format("listener[%s]-->>registered.", eventListener));
+            log.debug(String.format("listener[%s]-->>registered.", eventListener));
         }
     }
 
@@ -197,7 +201,7 @@ public class JbootEventManager {
         for (final JbootEventListener listener : syncListeners) {
             try {
                 if (Jboot.isDevMode()) {
-                    System.out.println(String.format("listener[%s]-->>onEvent(%s)", listener, event));
+                    log.debug(String.format("listener[%s]-->>onEvent(%s)", listener, event));
                 }
                 listener.onEvent(event);
             } catch (Throwable e) {
@@ -211,7 +215,7 @@ public class JbootEventManager {
             threadPool.execute(() -> {
                 try {
                     if (Jboot.isDevMode()) {
-                        System.out.println(String.format("listener[%s]-->>onEvent(%s) in async", listener, event));
+                        log.debug(String.format("listener[%s]-->>onEvent(%s) in async", listener, event));
                     }
                     listener.onEvent(event);
                 } catch (Throwable e) {

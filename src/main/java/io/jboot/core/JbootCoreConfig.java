@@ -19,7 +19,6 @@ import com.jfinal.aop.Aop;
 import com.jfinal.config.*;
 import com.jfinal.core.Controller;
 import com.jfinal.json.JsonManager;
-import com.jfinal.kit.StrKit;
 import com.jfinal.log.Log;
 import com.jfinal.plugin.activerecord.ActiveRecordPlugin;
 import com.jfinal.template.Engine;
@@ -30,21 +29,19 @@ import io.jboot.Jboot;
 import io.jboot.aop.JbootAopFactory;
 import io.jboot.aop.jfinal.JfinalHandlers;
 import io.jboot.aop.jfinal.JfinalPlugins;
-import io.jboot.core.log.Slf4jLogFactory;
 import io.jboot.components.rpc.JbootrpcManager;
 import io.jboot.components.schedule.JbootScheduleManager;
 import io.jboot.core.listener.JbootAppListenerManager;
+import io.jboot.core.log.Slf4jLogFactory;
 import io.jboot.db.JbootDbManager;
-import io.jboot.utils.ArrayUtil;
-import io.jboot.utils.ClassUtil;
-import io.jboot.utils.ClassScanner;
 import io.jboot.support.shiro.JbootShiroManager;
 import io.jboot.support.swagger.JbootSwaggerConfig;
 import io.jboot.support.swagger.JbootSwaggerController;
 import io.jboot.support.swagger.JbootSwaggerManager;
-import io.jboot.web.controller.JbootControllerManager;
+import io.jboot.utils.*;
 import io.jboot.web.JbootJson;
 import io.jboot.web.cache.ActionCacheHandler;
+import io.jboot.web.controller.JbootControllerManager;
 import io.jboot.web.controller.annotation.RequestMapping;
 import io.jboot.web.directive.annotation.JFinalDirective;
 import io.jboot.web.directive.annotation.JFinalSharedMethod;
@@ -99,24 +96,30 @@ public class JbootCoreConfig extends JFinalConfig {
         constants.setInjectDependency(true);
 
         JbootAppListenerManager.me().onJfinalConstantConfig(constants);
+
     }
 
 
     @Override
     public void configRoute(Routes routes) {
 
+        routes.setMappingSuperClass(true);
+
         List<Class<Controller>> controllerClassList = ClassScanner.scanSubClass(Controller.class);
         if (ArrayUtil.isNotEmpty(controllerClassList)) {
             for (Class<Controller> clazz : controllerClassList) {
                 RequestMapping mapping = clazz.getAnnotation(RequestMapping.class);
-                if (mapping == null || mapping.value() == null) {
-                    continue;
-                }
+                if (mapping == null) continue;
 
-                if (StrKit.notBlank(mapping.viewPath())) {
-                    routes.add(mapping.value(), clazz, mapping.viewPath());
+                String value = AnnotationUtil.get(mapping.value());
+                if (value == null) continue;
+
+                String viewPath = AnnotationUtil.get(mapping.viewPath());
+
+                if (StrUtil.isNotBlank(viewPath)) {
+                    routes.add(value, clazz, viewPath);
                 } else {
-                    routes.add(mapping.value(), clazz);
+                    routes.add(value, clazz);
                 }
             }
         }
@@ -146,9 +149,9 @@ public class JbootCoreConfig extends JFinalConfig {
 
         List<Class> directiveClasses = ClassScanner.scanClass();
         for (Class clazz : directiveClasses) {
-            JFinalDirective jFinalDirective = (JFinalDirective) clazz.getAnnotation(JFinalDirective.class);
-            if (jFinalDirective != null) {
-                engine.addDirective(jFinalDirective.value(), clazz);
+            JFinalDirective directive = (JFinalDirective) clazz.getAnnotation(JFinalDirective.class);
+            if (directive != null) {
+                engine.addDirective(AnnotationUtil.get(directive.value()), clazz);
             }
 
             JFinalSharedMethod sharedMethod = (JFinalSharedMethod) clazz.getAnnotation(JFinalSharedMethod.class);
@@ -163,7 +166,7 @@ public class JbootCoreConfig extends JFinalConfig {
 
             JFinalSharedObject sharedObject = (JFinalSharedObject) clazz.getAnnotation(JFinalSharedObject.class);
             if (sharedObject != null) {
-                engine.addSharedObject(sharedObject.value(), ClassUtil.newInstance(clazz));
+                engine.addSharedObject(AnnotationUtil.get(sharedObject.value()), ClassUtil.newInstance(clazz));
             }
         }
 
@@ -188,7 +191,6 @@ public class JbootCoreConfig extends JFinalConfig {
     public void configInterceptor(Interceptors interceptors) {
 
         JbootAppListenerManager.me().onInterceptorConfig(interceptors);
-
         JbootAppListenerManager.me().onFixedInterceptorConfig(FixedInterceptors.me());
     }
 
@@ -204,13 +206,21 @@ public class JbootCoreConfig extends JFinalConfig {
 
         handlers.add(new JbootFilterHandler());
         handlers.add(new ActionCacheHandler());
-        handlers.add(new JbootHandler());
+
+        if (handlers.getActionHandler() == null) {
+            handlers.add(new JbootHandler());
+        }
 
     }
 
     @Override
-    public void afterJFinalStart() {
-        super.afterJFinalStart();
+    public void onStart() {
+
+        JbootAppListenerManager.me().onJFinalStartBefore();
+
+        /**
+         * 配置微信accessToken的缓存
+         */
         ApiConfigKit.setAccessTokenCache(new JbootAccessTokenCache());
         JsonManager.me().setDefaultDatePattern("yyyy-MM-dd HH:mm:ss");
 
@@ -222,11 +232,11 @@ public class JbootCoreConfig extends JFinalConfig {
         JbootScheduleManager.me().init();
         JbootSwaggerManager.me().init();
 
-        JbootAppListenerManager.me().onJFinalStarted();
+        JbootAppListenerManager.me().onJFinalStart();
     }
 
     @Override
-    public void beforeJFinalStop() {
+    public void onStop() {
         Enumeration<Driver> drivers = DriverManager.getDrivers();
         if (drivers != null) {
             while (drivers.hasMoreElements()) {
@@ -239,6 +249,7 @@ public class JbootCoreConfig extends JFinalConfig {
             }
         }
         JbootAppListenerManager.me().onJFinalStop();
+        JbootScheduleManager.me().stop();
     }
 
 

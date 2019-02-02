@@ -16,10 +16,7 @@
 package io.jboot.db.model;
 
 import com.jfinal.core.JFinal;
-import com.jfinal.plugin.activerecord.Config;
-import com.jfinal.plugin.activerecord.Model;
-import com.jfinal.plugin.activerecord.Page;
-import com.jfinal.plugin.activerecord.Table;
+import com.jfinal.plugin.activerecord.*;
 import io.jboot.db.dialect.IJbootModelDialect;
 import io.jboot.exception.JbootException;
 import io.jboot.utils.StrUtil;
@@ -108,7 +105,7 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
 
 
     public boolean saveOrUpdate() {
-        if (null == get(_getPrimaryKey())) {
+        if (null == _getIdValue()) {
             return this.save();
         }
         return this.update();
@@ -117,7 +114,7 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
 
     @Override
     public boolean save() {
-        if (hasColumn(column_created) && get(column_created) == null) {
+        if (_hasColumn(column_created) && get(column_created) == null) {
             set(column_created, new Date());
         }
 
@@ -159,21 +156,21 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
         if (idValue == null) {
             throw new IllegalArgumentException("idValue can not be null");
         }
-        return idCacheEnable ? loadByCache(idValue) : super.findById(idValue);
+        return idCacheEnable ? loadByCache(idValue) : super.findByIds(idValue);
     }
 
     @Override
-    public M findById(Object... idValues) {
+    public M findByIds(Object... idValues) {
         if (idValues == null || idValues.length != _getPrimaryKeys().length) {
             throw new IllegalArgumentException("primary key nubmer must equals id value number and can not be null");
         }
-        return idCacheEnable ? loadByCache(idValues) : super.findById(idValues);
+        return idCacheEnable ? loadByCache(idValues) : super.findByIds(idValues);
     }
 
     protected M loadByCache(Object... idValues) {
         return config.getCache().get(_getTableName()
                 , buildCacheKey(idValues)
-                , () -> JbootModel.super.findById(idValues)
+                , () -> JbootModel.super.findByIds(idValues)
                 , config.getIdCacheTime());
     }
 
@@ -191,16 +188,16 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
     public boolean deleteById(Object idValue) {
         boolean success = super.deleteById(idValue);
         if (success && idCacheEnable) {
-            deleteIdCache(idValue);
+            deleteIdCacheById(idValue);
         }
         return success;
     }
 
     @Override
-    public boolean deleteById(Object... idValues) {
-        boolean success = super.deleteById(idValues);
+    public boolean deleteByIds(Object... idValues) {
+        boolean success = super.deleteByIds(idValues);
         if (success && idCacheEnable) {
-            deleteIdCache(idValues);
+            deleteIdCacheById(idValues);
         }
         return success;
     }
@@ -208,7 +205,7 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
 
     @Override
     public boolean update() {
-        if (hasColumn(column_modified)) {
+        if (_hasColumn(column_modified)) {
             set(column_modified, new Date());
         }
 
@@ -232,20 +229,20 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
         return super.update();
     }
 
-    protected void deleteIdCache() {
+    public void deleteIdCache() {
         if (_getPrimaryKeys().length == 1) {
             Object idValue = get(_getPrimaryKey());
-            deleteIdCache(idValue);
+            deleteIdCacheById(idValue);
         } else {
             Object[] idvalues = new Object[_getPrimaryKeys().length];
             for (int i = 0; i < idvalues.length; i++) {
                 idvalues[i] = get(_getPrimaryKeys()[i]);
             }
-            deleteIdCache(idvalues);
+            deleteIdCacheById(idvalues);
         }
     }
 
-    private void deleteIdCache(Object... idvalues) {
+    public void deleteIdCacheById(Object... idvalues) {
         config.getCache().remove(_getTableName(), buildCacheKey(idvalues));
     }
 
@@ -435,22 +432,22 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
                 : paginate(pageNumber, pageSize, selectPartSql, fromPartSql, columns.getValueArray());
     }
 
-    public <T> T getIdValue() {
+    public <T> T _getIdValue() {
         return get(_getPrimaryKey());
     }
 
 
-    protected String _getTableName() {
+    public String _getTableName() {
         return _getTable(true).getName();
     }
 
-    protected Table _getTable() {
+    public Table _getTable() {
         return _getTable(false);
     }
 
     private transient Table table;
 
-    protected Table _getTable(boolean validateNull) {
+    public Table _getTable(boolean validateNull) {
         if (table == null) {
             table = super._getTable();
             if (table == null && validateNull) {
@@ -466,13 +463,13 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
     }
 
 
-    protected String _getPrimaryKey() {
+    public String _getPrimaryKey() {
         return _getPrimaryKeys()[0];
     }
 
     private transient String[] primaryKeys;
 
-    protected String[] _getPrimaryKeys() {
+    public String[] _getPrimaryKeys() {
         if (primaryKeys != null) {
             return primaryKeys;
         }
@@ -495,7 +492,7 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
     }
 
 
-    protected boolean hasColumn(String columnLabel) {
+    protected boolean _hasColumn(String columnLabel) {
         return _getTable(true).hasColumnLabel(columnLabel);
     }
 
@@ -569,20 +566,18 @@ public class JbootModel<M extends JbootModel<M>> extends Model<M> {
 
     @Override
     public boolean equals(Object o) {
-        if (o == null) {
+
+        if (o == null || !(o instanceof JbootModel)) {
             return false;
         }
 
-        if (!(o instanceof JbootModel)) {
-            return false;
+        //可能model在rpc的Controller层，没有映射到数据库
+        if (_getTable(false) == null) {
+            return this == o;
         }
 
-        Object id = ((JbootModel) o).get(_getPrimaryKey());
-        if (id == null) {
-            return false;
-        }
-
-        return id.equals(get(_getPrimaryKey()));
+        Object id = ((JbootModel) o)._getIdValue();
+        return id != null && id.equals(_getIdValue());
     }
 
 

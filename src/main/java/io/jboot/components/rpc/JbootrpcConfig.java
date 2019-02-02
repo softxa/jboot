@@ -16,6 +16,7 @@
 package io.jboot.components.rpc;
 
 import io.jboot.app.config.annotation.ConfigModel;
+import io.jboot.utils.StrUtil;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -35,7 +36,6 @@ public class JbootrpcConfig {
     public static final String REGISTRY_TYPE_ZOOKEEPER = "zookeeper";
 
 
-
     /**
      * RPC的调用模式：registry 注册中心，direct直连模式
      */
@@ -43,7 +43,7 @@ public class JbootrpcConfig {
     public static final String CALL_MODE_DIRECT = "direct";
 
 
-    private String type = TYPE_DUBBO;
+    private String type;
     private String callMode = CALL_MODE_REGISTRY;
 
     private int requestTimeOut = 5000;
@@ -91,8 +91,8 @@ public class JbootrpcConfig {
     //重试次数，不配置默认使用框架默认配置 motan和dubbo可能不一样
     private Integer retries;
 
-    //关闭本地自动暴露 @RPCBean 的service
-    private boolean closeAutoExport = false;
+    //本地自动暴露 @RPCBean 的service
+    private boolean autoExportEnable = true;
 
 
     public String getHost() {
@@ -291,11 +291,15 @@ public class JbootrpcConfig {
         this.retries = retries;
     }
 
-    public boolean isCloseAutoExport() {
-        return closeAutoExport;
+    public boolean isAutoExportEnable() {
+        return autoExportEnable;
     }
 
-    public void setCloseAutoExport(boolean closeAutoExport) {
-        this.closeAutoExport = closeAutoExport;
+    public void setAutoExportEnable(boolean autoExportEnable) {
+        this.autoExportEnable = autoExportEnable;
+    }
+
+    public boolean isConfigOk() {
+        return StrUtil.isNotBlank(getType());
     }
 }

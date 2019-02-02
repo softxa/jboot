@@ -15,7 +15,13 @@
  */
 package io.jboot.core.spi;
 
+import io.jboot.utils.AnnotationUtil;
+import io.jboot.utils.ClassScanner;
+import io.jboot.utils.ClassUtil;
+import io.jboot.utils.StrUtil;
+
 import java.util.Iterator;
+import java.util.List;
 import java.util.ServiceLoader;
 
 /**
@@ -41,21 +47,56 @@ public class JbootSpiLoader {
      * @return
      */
     public static <T> T load(Class<T> clazz, String spiName) {
-        ServiceLoader<T> serviceLoader = ServiceLoader.load(clazz);
-        Iterator<T> iterator = serviceLoader.iterator();
-        while (iterator.hasNext()) {
-            T t = iterator.next();
-            if (spiName == null) {
-                return t;
-            }
-            JbootSpi spi = t.getClass().getAnnotation(JbootSpi.class);
-            if (spi == null) {
-                continue;
-            }
-            if (spiName.equals(spi.value())) {
-                return t;
+        T returnObject = loadByServiceLoader(clazz, spiName);
+        if (returnObject != null) return returnObject;
+
+        if (StrUtil.isBlank(spiName)) {
+            return null;
+        }
+
+        List<Class<T>> classes = ClassScanner.scanSubClass(clazz);
+        if (classes == null || classes.isEmpty()) {
+            return null;
+        }
+
+        for (Class<T> c : classes) {
+            JbootSpi spiConfig = c.getAnnotation(JbootSpi.class);
+            if (spiConfig != null && spiName.equals(AnnotationUtil.get(spiConfig.value()))) {
+                return ClassUtil.newInstance(c);
             }
         }
+        return null;
+    }
+
+    /**
+     * 通过 ServiceLoader 加载
+     *
+     * @param clazz
+     * @param spiName
+     * @param <T>
+     * @return
+     */
+    public static <T> T loadByServiceLoader(Class<T> clazz, String spiName) {
+        ServiceLoader<T> serviceLoader = ServiceLoader.load(clazz);
+        Iterator<T> iterator = serviceLoader.iterator();
+
+        while (iterator.hasNext()) {
+            T returnObject = iterator.next();
+
+            if (spiName == null) {
+                return returnObject;
+            }
+
+            JbootSpi spiConfig = returnObject.getClass().getAnnotation(JbootSpi.class);
+            if (spiConfig == null) {
+                continue;
+            }
+
+            if (spiName.equals(AnnotationUtil.get(spiConfig.value()))) {
+                return returnObject;
+            }
+        }
+
         return null;
     }
 }
